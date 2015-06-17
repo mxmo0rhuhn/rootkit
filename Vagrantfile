@@ -19,6 +19,7 @@ Vagrant.configure(2) do |config|
   ["3.10.77", "4.0.5"].each do |j|
     config.vm.define vm_name = "kernel-%s" % j do |kernel|
       kernel.vm.hostname = vm_name
+      kernel.vm.synced_folder "./src", "/vagrant_src"
 
       kernel.vm.provision "shell", inline: <<-SHELL
         sudo sh -c 'echo "sys-kernel/gentoo-sources ~amd64" >> /etc/portage/package.accept_keywords/kernel'
