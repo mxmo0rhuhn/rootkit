@@ -25,13 +25,17 @@
 // Kernel live patch 
 //#include <linux/livepatch.h>
 
+
 int hijack_init(void) {
- printk("hijack: LKM loaded\n");
- return 0;
+//  list_del_init(&__this_module.list);
+//  kobject_del(&THIS_MODULE->mkobj.kobj);
+
+  printk("hijack: LKM loaded\n");
+  return 0;
 }
 
 void hijack_exit(void) {
- printk("hijack: LKM removed\n");
+  printk("hijack: LKM removed\n");
 }
 
 MODULE_LICENSE("EUPL");
