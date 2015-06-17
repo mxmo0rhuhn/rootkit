@@ -3,7 +3,7 @@
 
 $vb_gui = false
 $vb_memory = 1024
-$vb_cpus = 1
+$vb_cpus = 2
 
 Vagrant.configure(2) do |config|
   config.vm.box = "Gentoo_amd64_minimal"
@@ -30,6 +30,7 @@ Vagrant.configure(2) do |config|
         sudo genkernel --install --symlink --oldconfig --bootloader=grub all
         sudo grub2-mkconfig -o /boot/grub/grub.cfg
         sudo grub2-install --no-floppy /dev/sda
+        sudo emerge -vq app-emulation/virtualbox-guest-additions
         sudo reboot
       SHELL
     end
