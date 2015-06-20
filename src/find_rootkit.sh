@@ -9,6 +9,9 @@ success() {
 } 
 
 case "$1" in
+  remove)
+    sudo rmmod sys_call_hijack.ko
+    ;;
   compile)
     make
     sudo insmod sys_call_hijack.ko
@@ -26,7 +29,7 @@ case "$1" in
     success $(grep hijack /proc/kallsyms )
     ;;
   *)
-    echo "find insert "
+    echo "compile remove fs"
     ;;
 esac
 

