@@ -1,4 +1,5 @@
 obj-m := sys_call_hijack.o
+#obj-m += livepatch.o
 KERNEL_DIR = /lib/modules/$(shell uname -r)/build
 PWD = $(shell pwd)
 all:
