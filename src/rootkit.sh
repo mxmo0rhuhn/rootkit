@@ -23,6 +23,7 @@ case "$1" in
     cd
     touch .evil
     echo "file created"
+    echo "ls -al .evil"
     ls -al .evil
     bash -c "exec -a .evil sleep 600" &
     echo "process created"
