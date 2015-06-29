@@ -1,4 +1,4 @@
-#!/bin/bash - 
+#!/bin/bash
 
 success() {
   if [ -z $1 ] ; then
@@ -14,6 +14,7 @@ case "$1" in
     dmesg | grep hijack
     ;;
   compile)
+    make clean
     make
     sudo insmod sys_call_hijack.ko
     dmesg | grep hijack
@@ -38,8 +39,6 @@ case "$1" in
     success $(ls /sys/module | grep hijack)
     echo "modinfo sys_call_hijack"
     modinfo sys_call_hijack
-#    echo "sudo modprobe -c | grep hijack"
-#    success $(sudo modprobe -c | grep hijack)
     echo "grep hijack /proc/kallsyms "
     success $(grep hijack /proc/kallsyms )
     ;;
@@ -47,4 +46,3 @@ case "$1" in
     echo "compile remove fs call"
     ;;
 esac
-
